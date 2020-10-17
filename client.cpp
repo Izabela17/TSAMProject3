@@ -4,6 +4,7 @@
 // Command line: ./chat_client 4000 
 //
 // Author: Jacky Mallett (jacky@ru.is)
+// Modified by Izabela Kinga Nieradko
 //
 #include <stdio.h>
 #include <errno.h>
@@ -52,6 +53,7 @@ void listenServer(int serverSocket)
     }
 }
 
+
 int main(int argc, char* argv[])
 {
    struct addrinfo hints, *svr;              // Network host entry for server
@@ -61,6 +63,7 @@ int main(int argc, char* argv[])
    char buffer[1025];                        // buffer for writing to server
    bool finished;                   
    int set = 1;                              // Toggle for setsockopt
+
 
    if(argc != 3)
    {
@@ -113,19 +116,49 @@ int main(int argc, char* argv[])
    std::thread serverThread(listenServer, serverSocket);
 
    finished = false;
+   int input;
+   int groupNumb;
+   std::string commandToSend;
+   std::string messageToSend;
+
    while(!finished)
    {
-       bzero(buffer, sizeof(buffer));
 
-       fgets(buffer, sizeof(buffer), stdin);
+	   std::cout << "Enter number for command: 1 --> GETMSG, 2 --> SENDMSG, 3 --> LISTSERVERS \n";
+	   std::cin >> input;
+	   if (std::cin.fail()) {
+		   std::cout << "Only ints accepted! \n";
+	   }
+	   if(input == 1){
+	   		std::cout << "Enter group number you want to send the message to \n";
+	   		std::cin >> groupNumb;
+		   if (std::cin.fail()) {
+			   std::cout << "Only ints accepted! \n";
+		   }
+		   commandToSend = "*GETMSG,GROUP_" + std::to_string(groupNumb) + "#";
+	   }else if(input == 2){
+		   std::cout << "Enter group number you want to send the message to \n";
+		   std::cin >> groupNumb;
+		   if (std::cin.fail()) {
+			   std::cout << "Only ints accepted! \n";
+		   }
+		   std::cout << "Enter the message to send: \n";
+		   std::cin >> messageToSend;
+		   commandToSend = "*SENDMSG,GROUP_" + std::to_string(groupNumb) + "." + messageToSend + "#";
+	   }else{
+	   	commandToSend = "*LISTSERVERS#";
+	   }
+	   bzero(buffer, sizeof(buffer));
+	   fgets(buffer, sizeof(buffer), stdin);
 
-       nwrite = send(serverSocket, buffer, strlen(buffer),0);
+       nwrite = send(serverSocket, messageToSend.c_str(), strlen(buffer)+1,0);
 
        if(nwrite  == -1)
        {
            perror("send() to server failed: ");
            finished = true;
        }
+
 
    }
 }
