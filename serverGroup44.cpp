@@ -133,7 +133,7 @@ int connectToServer() {
 
 	 memset(&hints, 0, sizeof(hints));
 
-	 if (getaddrinfo("127.0.0.1", "4001", &hints, &svr) != 0) {
+	 if (getaddrinfo("127.0.0.1", "4012", &hints, &svr) != 0) {
 		 perror("getaddrinfo failed: ");
 		 exit(0);
 	 }
@@ -146,7 +146,7 @@ int connectToServer() {
 	 bcopy((char *) server->h_addr,
 		   (char *) &serv_addr.sin_addr.s_addr,
 		   server->h_length);
-	 serv_addr.sin_port = htons(4001);
+	 serv_addr.sin_port = htons(4012);
 
 	 serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 	// Turn on SO_REUSEADDR to allow socket to be quickly reused after
@@ -276,7 +276,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds,
 		msg = "*CONNECTED,P3_GROUP_44,127.0.0.1,4044#";
 		// Reducing the msg length by 1 loses the excess "," - which
 		// granted is totally cheating.
-		send(serverSocket, msg.c_str(), msg.length(), 0);
+		send(serverSocket, msg.c_str(), msg.length() + 1, 0);
 
 	}
 		// This is slightly fragile, since it's relying on the order
@@ -345,6 +345,7 @@ int main(int argc, char* argv[])
 	//int clientConnections = openSocket(atoi(clientPortNumb));
 	int ourServersConnection = connectToServer();
 	serverMessagesSend(ourServersConnection);
+
 
 	if(listen(serverConnections, BACKLOG) < 0)
 	{
