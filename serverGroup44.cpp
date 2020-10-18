@@ -276,7 +276,7 @@ void serverCommand(int serverSocket, fd_set *openSockets, int *maxfds,
 		msg = "*CONNECTED,P3_GROUP_44,127.0.0.1,4044#";
 		// Reducing the msg length by 1 loses the excess "," - which
 		// granted is totally cheating.
-		send(serverSocket, msg.c_str(), msg.length()-1, 0);
+		send(serverSocket, msg.c_str(), msg.length(), 0);
 
 	}
 		// This is slightly fragile, since it's relying on the order
@@ -342,8 +342,9 @@ int main(int argc, char* argv[])
 	
 	printf("Listening on port: %d\n", atoi(argv[1]));
 	int serverConnections = openSocket(atoi(argv[1]));
-	int clientConnections = openSocket(atoi(clientPortNumb));
+	//int clientConnections = openSocket(atoi(clientPortNumb));
 	int ourServersConnection = connectToServer();
+	serverMessagesSend(ourServersConnection);
 
 	if(listen(serverConnections, BACKLOG) < 0)
 	{
@@ -425,6 +426,147 @@ int main(int argc, char* argv[])
 				// Remove client from the clients list
 				for(auto const& s : disconnectedServers)
 					servers.erase(s->sock);
+			}
+		}
+	}
+}
+int main(int argc, char* argv[])
+{
+	bool finished;
+	int listenSock;                 // Socket for connections to server
+	int clientSock;                 // Socket of connecting client
+	int serverSock;                 // Socket of connecting servers
+	fd_set openSockets;             // Current open sockets
+	fd_set readSockets;             // Socket list for select()
+	fd_set exceptSockets;           // Exception socket list
+	int maxfds;                     // Passed to select() as max fd in set
+	struct sockaddr_in client;
+	struct sockaddr_in server;
+	socklen_t clientLen;
+	socklen_t serverLen;
+	char buffer[5000];              // buffer for reading from clients
+	if(argc != 2)
+	{
+		printf("Usage: chat_server <port>\n");
+		exit(0);
+	}
+	// Setup socket for server to listen to
+	listenSock = open_socket(atoi(argv[1]));
+	printf("Listening on port: %d\n", atoi(argv[1]));
+	if(listen(listenSock, BACKLOG) < 0)
+	{
+		printf("Listen failed on port %s\n", argv[1]);
+		exit(0);
+	}
+	else
+		// Add listen socket to socket set we are monitoring
+	{
+		FD_ZERO(&openSockets);
+		FD_SET(listenSock, &openSockets);
+		maxfds = listenSock;
+	}
+	finished = false;
+	while(!finished)
+	{
+		// Get modifiable copy of readSockets
+		readSockets = exceptSockets = openSockets;
+		memset(buffer, 0, sizeof(buffer));
+		// Look at sockets and see which ones have something to be read()
+		int n = select(maxfds + 1, &readSockets, NULL, &exceptSockets, NULL);
+		if(n < 0)
+		{
+			perror("select failed - closing down\n");
+			finished = true;
+		}
+		else
+		{
+			// First, accept  any new connections to the server on the listening socket
+			if(FD_ISSET(listenSock, &readSockets))
+			{
+				clientSock = accept(listenSock, (struct sockaddr *)&client,
+									&clientLen);
+				printf("accept***\n");
+				// Add new client to the list of open sockets
+				FD_SET(clientSock, &openSockets);
+				// And update the maximum file descriptor
+				maxfds = std::max(maxfds, clientSock) ;
+				// create a new client to store information.
+				clients[clientSock] = new Client(clientSock);
+				// Decrement the number of sockets waiting to be dealt with
+				n--;
+				printf("Client connected on server: %d\n", clientSock);
+			}
+			// First, accept  any new connections to the server on the listening socket
+			if(FD_ISSET(listenSock, &readSockets))
+			{
+				serverSock = accept(listenSock, (struct sockaddr *)&server,
+									&serverLen);
+				printf("accept***\n");
+				// Add new client to the list of open sockets
+				FD_SET(serverSock, &openSockets);
+				// And update the maximum file descriptor
+				maxfds = std::max(maxfds, serverSock) ;
+				// create a new server to store information.
+				serversInt[serverSock] = new Server(serverSock);
+				// Decrement the number of sockets waiting to be dealt with
+				n--;
+				printf("Server connected on server: %d\n", serverSock);
+			}
+			// Now check for commands from clients
+			std::list<Client *> disconnectedClients;
+			while(n-- > 0)
+			{
+				for(auto const& pair : clients)
+				{
+					Client *client = pair.second;
+					if(FD_ISSET(client->sock, &readSockets))
+					{
+						// recv() == 0 means client has closed connection
+						if(recv(client->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
+						{
+							disconnectedClients.push_back(client);
+							closeClient(client->sock, &openSockets, &maxfds);
+						}
+							// We don't check for -1 (nothing received) because select()
+							// only triggers if there is something on the socket for us.
+						else
+						{
+							std::cout << buffer << std::endl;
+							clientCommand(client->sock, &openSockets, &maxfds, buffer);
+						}
+					}
+				}
+				// Remove client from the clients list
+				for(auto const& c : disconnectedClients)
+					clients.erase(c->sock);
+			}
+			// Now check for commands from servers
+			std::list<Server *> disconnectedServers;
+			while(n-- > 0)
+			{
+				for(auto const& pair : serversInt)
+				{
+					Server *server = pair.second;
+					if(FD_ISSET(server->sock, &readSockets))
+					{
+						// recv() == 0 means client has closed connection
+						if(recv(server->sock, buffer, sizeof(buffer), MSG_DONTWAIT) == 0)
+						{
+							disconnectedServers.push_back(server);
+							closeClient(server->sock, &openSockets, &maxfds);
+						}
+							// We don't check for -1 (nothing received) because select()
+							// only triggers if there is something on the socket for us.
+						else
+						{
+							std::cout << buffer << std::endl;
+							serverCommand(server->sock, &openSockets, &maxfds, buffer, argv[1]);
+						}
+					}
+				}
+				// Remove servers from the servers list
+				for(auto const& c : disconnectedServers)
+					serversInt.erase(c->sock);
 			}
 		}
 	}
