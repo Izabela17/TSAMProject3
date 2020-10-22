@@ -25,6 +25,7 @@
 #include <fstream>
 #include <tuple>
 #include <netinet/ip_icmp.h>
+#include <net/if.h>
 
 #include <iostream>
 #include <sstream>
@@ -147,23 +148,55 @@ int open_socket(int portno)
 // tidy up select sockets afterwards.
 
 std::string getMyIP(){
-	std::string ipAddress = "Unable to get IP address";
-	struct ifaddrs *intefaces = NULL;
-	struct ifaddrs *temp_addres = NULL;
-	int retrive = getifaddrs(&intefaces);
-	if (retrive == 0) {
-		temp_addres = intefaces;
-		while (temp_addres != NULL){
-			if(temp_addres->ifa_addr->sa_family == AF_INET){
-				if(strcmp(temp_addres->ifa_name,"en0")==0){
-					ipAddress=inet_ntoa(((struct sockaddr_in*)temp_addres->ifa_addr)->sin_addr);
-				}
+	struct ifaddrs *myaddrs, *ifa;
+	void *in_addr;
+	char buf[64];
+
+	if(getifaddrs(&myaddrs) != 0)
+	{
+		perror("getifaddrs");
+		exit(1);
+	}
+
+	for (ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+	{
+		if (ifa->ifa_addr == NULL)
+			continue;
+		if (!(ifa->ifa_flags & IFF_UP))
+			continue;
+
+		switch (ifa->ifa_addr->sa_family)
+		{
+			case AF_INET:
+			{
+				struct sockaddr_in *s4 = (struct sockaddr_in *)ifa->ifa_addr;
+				in_addr = &s4->sin_addr;
+				break;
 			}
-			temp_addres = temp_addres->ifa_next;
+
+			case AF_INET6:
+			{
+				struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+				in_addr = &s6->sin6_addr;
+				break;
+			}
+
+			default:
+				continue;
+		}
+
+		if (!inet_ntop(ifa->ifa_addr->sa_family, in_addr, buf, sizeof(buf)))
+		{
+			printf("%s: inet_ntop failed!\n", ifa->ifa_name);
+		}
+		else
+		{
+			std::string str(buf, sizeof(buf));
+			return str;
 		}
 	}
-	freeifaddrs(intefaces);
-	return ipAddress;
+	freeifaddrs(myaddrs);
+	return "";
 }
 
 
@@ -297,7 +330,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
 	for (auto const& command : commands) {
 		serverCommandParts = splitServerCommand(command.c_str());
 	}
-
+	std::cout << serverCommandParts[0] << std::endl;
 
 	if((tokens[0].compare("CONNECT") == 0))
 	{
@@ -318,7 +351,14 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
 
 		closeClient(clientSocket, openSockets, maxfds);
 	}
-	else if(serverCommandParts[0].compare("QUERYSERVERS") == 0)
+	else if(serverCommandParts[0].compare("CONNECTED") == 0)
+	{
+		clients[clientSocket]->name = serverCommandParts[1];
+		clients[clientSocket]->ipNum = serverCommandParts[2];
+		clients[clientSocket]->portNum = stoi(serverCommandParts[3]);
+
+	}
+	else if(serverCommandParts[0].find("QUERYSERVERS") != std::string::npos)
 	{
 		std::string msg;
 		msg = "*CONNECTED,";
@@ -328,7 +368,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
 			Client *client = pair.second;
 			if(client->name != "OurClient") {
 				std::cout << client->name << std::endl;
-				std::cout << client->ipNum << std::end;
+				std::cout << client->ipNum << std::endl;
 				std::cout << std::to_string(client->portNum) << std::endl;
 
 				msg += client->name + "," + client->ipNum + "," + std::to_string(client->portNum) + ";";
@@ -343,13 +383,6 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
 
 	}
 
-	else if(serverCommandParts[0].compare("CONNECTED") == 0)
-	{
-		clients[clientSocket]->name = serverCommandParts[1];
-		clients[clientSocket]->ipNum = serverCommandParts[2];
-		clients[clientSocket]->portNum = stoi(serverCommandParts[3]);
-
-	}
 		// This is slightly fragile, since it's relying on the order
 		// of evaluation of the if statement.
 	else if((tokens[0].compare("GETMSG,") == 0) && (tokens.size() == 2))
