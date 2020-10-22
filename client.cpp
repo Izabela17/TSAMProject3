@@ -50,7 +50,6 @@ void listenServer(int serverSocket)
        {
           printf("%s\n", buffer);
        }
-       printf("here\n");
     }
 }
 
@@ -108,9 +107,12 @@ int main(int argc, char* argv[])
    
    if(connect(serverSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr) )< 0)
    {
-       printf("Failed to open socket to server: %s\n", argv[1]);
-       perror("Connect failed: ");
-       exit(0);
+       if(errno != EINPROGRESS)
+       {
+       	printf("Failed to open socket to server: %s\n", argv[1]);
+       	perror("Connect failed: ");
+       	exit(0);
+       }
    }
 
     // Listen and print replies from server
@@ -119,13 +121,15 @@ int main(int argc, char* argv[])
    finished = false;
    int input;
    int groupNumb;
+   std::string ipNumber;
+   std::string portNumber;
    std::string commandToSend;
    std::string messageToSend;
 
    while(!finished)
    {
 
-	   std::cout << "Enter number for command: 1 --> GETMSG, 2 --> SENDMSG, 3 --> LISTSERVERS \n";
+	   std::cout << "Enter number for command: 1 --> GETMSG, 2 --> SENDMSG, 3 --> CONNECT_TO_ANOTHER_SERVER, 4 --> LISTSERVERS \n";
 	   std::cin >> input;
 	   if (std::cin.fail()) {
 		   std::cout << "Only ints accepted! \n";
@@ -136,7 +140,7 @@ int main(int argc, char* argv[])
 		   if (std::cin.fail()) {
 			   std::cout << "Only ints accepted! \n";
 		   }
-		   commandToSend = "*GETMSG,GROUP_" + std::to_string(groupNumb) + "#";
+		   commandToSend = std::string("GETMSG") + std::string(" ") + std::string("GROUP_") + std::to_string(groupNumb);
 	   }else if(input == 2){
 		   std::cout << "Enter group number you want to send the message to \n";
 		   std::cin >> groupNumb;
@@ -145,14 +149,22 @@ int main(int argc, char* argv[])
 		   }
 		   std::cout << "Enter the message to send: \n";
 		   std::cin >> messageToSend;
-		   commandToSend = "*SENDMSG,GROUP_" + std::to_string(groupNumb) + "." + messageToSend + "#";
+		   commandToSend = std::string("SENDMSG") + std::string(" ") + std::string("GROUP_") + std::to_string(groupNumb) + std::string(" ") + messageToSend;
+	   }else if(input == 3){
+		   std::cout << "Enter the ip number of group you want to connect to: \n";
+		   std::cin >> ipNumber;
+
+		   std::cout << "Enter the port number of the group you want to connect to: \n";
+		   std::cin >> portNumber;
+		   commandToSend = std::string("CONNECT") + std::string(" ") + ipNumber + std::string(" ") + portNumber;
+
 	   }else{
-	   	commandToSend = "*LISTSERVERS#";
+	   	commandToSend = "*QUERYSERVERS_PG_44#";
 	   }
 	   bzero(buffer, sizeof(buffer));
 	   fgets(buffer, sizeof(buffer), stdin);
-
-       nwrite = send(serverSocket, messageToSend.c_str(), strlen(buffer)+1,0);
+	   std::cout << commandToSend << std::endl;
+       nwrite = send(serverSocket, commandToSend.c_str(), commandToSend.size()+1,0);
 
        if(nwrite  == -1)
        {
