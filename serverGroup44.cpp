@@ -442,9 +442,9 @@ int main(int argc, char* argv[])
 	{
 		FD_ZERO(&openSockets);
 		FD_SET(listenSock, &openSockets);
-		clients[clientSock] = new Client(listenSock,"P3_GROUP_44");
-		clients[clientSock] -> ipNum = ipNumber.c_str();
-		clients[clientSock] -> portNum = atoi(argv[1]);
+		clients[listenSock] = new Client(listenSock,"P3_GROUP_44");
+		clients[listenSock] -> ipNum = ipNumber.c_str();
+		clients[listenSock] -> portNum = atoi(argv[1]);
 		maxfds = listenSock;
 	}
 	if(listen(clientConnection,BACKLOG) <0){
