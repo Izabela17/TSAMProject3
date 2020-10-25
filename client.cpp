@@ -23,13 +23,22 @@
 #include <vector>
 #include <thread>
 
-//#include <linux/sockios.h>
 #include <iostream>
 #include <sstream>
 #include <thread>
 #include <map>
+#include <ctime>
+#include <chrono>
+#include <ctime>
+#include <limits>
 
-// Threaded function for handling responss from server
+
+void timestamp() {
+	auto timestamp = std::chrono::system_clock::now();
+	std::time_t time = std::chrono::system_clock::to_time_t(timestamp);
+	std::string timestampString = std::ctime(&time);
+	std::cout << timestampString << std::endl;
+}
 
 void listenServer(int serverSocket)
 {
@@ -48,11 +57,11 @@ void listenServer(int serverSocket)
        }
        else if(nread > 0)
        {
-          printf("%s\n", buffer);
+       	  timestamp();
+          std::cout << buffer << std::endl;
        }
     }
 }
-
 
 int main(int argc, char* argv[])
 {
@@ -63,6 +72,7 @@ int main(int argc, char* argv[])
    char buffer[1025];                        // buffer for writing to server
    bool finished;                   
    int set = 1;                              // Toggle for setsockopt
+
 
 
    if(argc != 3)
@@ -129,43 +139,52 @@ int main(int argc, char* argv[])
    while(!finished)
    {
 
-	   std::cout << "Enter number for command: 1 --> GETMSG, 2 --> SENDMSG, 3 --> CONNECT_TO_ANOTHER_SERVER, 4 --> LISTSERVERS \n";
+	   std::cout << "Enter number for command: 1 --> GETMSG, 2 --> SENDMSG, 3 --> CONNECT_TO_ANOTHER_SERVER, 4 --> LISTSERVERS , 5 --> LEAVE SERVER \n";
 	   std::cin >> input;
 	   if (std::cin.fail()) {
 		   std::cout << "Only ints accepted! \n";
 	   }
 	   if(input == 1){
-	   		std::cout << "Enter group number you want to send the message to \n";
+	   		std::cout << "Enter group number you want to get message from \n";
 	   		std::cin >> groupNumb;
 		   if (std::cin.fail()) {
 			   std::cout << "Only ints accepted! \n";
 		   }
 		   commandToSend = std::string("GETMSG") + std::string(" ") + std::string("GROUP_") + std::to_string(groupNumb);
 	   }else if(input == 2){
+		   std::cin.clear();
 		   std::cout << "Enter group number you want to send the message to \n";
 		   std::cin >> groupNumb;
 		   if (std::cin.fail()) {
 			   std::cout << "Only ints accepted! \n";
 		   }
+		   std::cin.clear();
+		   std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n' );
 		   std::cout << "Enter the message to send: \n";
-		   std::cin >> messageToSend;
-		   commandToSend = std::string("SENDMSG") + std::string(" ") + std::string("GROUP_") + std::to_string(groupNumb) + std::string(" ") + messageToSend;
+		   getline(std::cin, messageToSend);
+		   std::cin.clear();
+		   commandToSend = std::string("SENDMSG") + std::string(" ") + std::string("P3_GROUP_") + std::to_string(groupNumb) + std::string(" ") + messageToSend;
+		   std::cout << commandToSend << " command to send" << std::endl;
 	   }else if(input == 3){
 		   std::cout << "Enter the ip number of group you want to connect to: \n";
 		   std::cin >> ipNumber;
-
 		   std::cout << "Enter the port number of the group you want to connect to: \n";
 		   std::cin >> portNumber;
 		   commandToSend = std::string("CONNECT") + std::string(" ") + ipNumber + std::string(" ") + portNumber;
 
-	   }else{
+	   }else if(input == 4){
+		   std::cout << "Enter the ip number of group you want to disconnect from: \n";
+		   std::cin >> ipNumber;
+		   std::cout << "Enter the port number of the group you want to disconnect from: \n";
+		   std::cin >> portNumber;
+		   commandToSend = std::string("LEAVE") + std::string(" ") + ipNumber + std::string(" ") + portNumber;
+	   }
+	   	else{
 	   	commandToSend = "*QUERYSERVERS_PG_44#";
 	   }
 	   bzero(buffer, sizeof(buffer));
-	   fgets(buffer, sizeof(buffer), stdin);
-	   std::cout << commandToSend << std::endl;
-       nwrite = send(serverSocket, commandToSend.c_str(), commandToSend.size()+1,0);
-
+	   timestamp();
+       nwrite = send(serverSocket, commandToSend.c_str(), commandToSend.length(),0);
        if(nwrite  == -1)
        {
            perror("send() to server failed: ");
