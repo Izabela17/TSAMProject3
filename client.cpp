@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
 		   if (std::cin.fail()) {
 			   std::cout << "Only ints accepted! \n";
 		   }
-		   commandToSend = std::string("GETMSG") + std::string(" ") + std::string("GROUP_") + std::to_string(groupNumb);
+		   commandToSend = std::string("GETMSG") + std::string(" ") + std::string("P3_GROUP_") + std::to_string(groupNumb);
 	   }else if(input == 2){
 		   std::cin.clear();
 		   std::cout << "Enter group number you want to send the message to \n";
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
 		   std::cin >> portNumber;
 		   commandToSend = std::string("CONNECT") + std::string(" ") + ipNumber + std::string(" ") + portNumber;
 
-	   }else if(input == 4){
+	   }else if(input == 5){
 		   std::cout << "Enter the ip number of group you want to disconnect from: \n";
 		   std::cin >> ipNumber;
 		   std::cout << "Enter the port number of the group you want to disconnect from: \n";
