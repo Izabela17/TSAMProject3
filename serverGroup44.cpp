@@ -5,7 +5,7 @@
 //
 // Author: Jacky Mallett (jacky@ru.is)
 //
-// Modyfied by Izabela Kinga Nieradko (izabela17@ru.is)
+// Modified by Izabela Kinga Nieradko (izabela17@ru.is) && Aron Úlfarsson (aronu17@ru.is)
 //
 #include <stdio.h>
 #include <errno.h>
@@ -214,15 +214,20 @@ std::string getMyIP(){
 	return "";
 }
 
-//Erasing the begginign * and # to prepare to split on ,
+//Erasing the begging * and # to prepare to split on ,
 std::string splitCommands(char* buffer) {
 	std::string str = std::string(buffer);
-	str.erase(remove(str.begin(), str.end(), '#'), str.end());
-	str.erase(remove(str.begin(), str.end(), '*'), str.end());
-	str.erase(remove(str.begin(), str.end(), '\n'), str.end());
+	if ((str.find('#') != std::string::npos) && (str.find('#') != std::string::npos)){
+		str.erase(remove(str.begin(), str.end(), '#'), str.end());
+		str.erase(remove(str.begin(), str.end(), '*'), str.end());
+		str.erase(remove(str.begin(), str.end(), '\n'), str.end());
+	}else{
+		std::cout << "Badly formatted string!" << std::endl;
+	}
+
 	return str;
 }
-// Spliting the prepared string on , and append it to vector of commands
+// Splitting the prepared string on , and append it to vector of commands
 std::vector<std::string> splitServerCommand(std::string command) {
 	char delimeter = ',';
 	std::stringstream ss(command);
@@ -243,7 +248,6 @@ void closeClient(int clientSocket, fd_set *openSockets, int *maxfds)
 	// If this client's socket is maxfds then the next lowest
 	// one has to be determined. Socket fd's can be reused by the Kernel,
 	// so there aren't any nice ways to do this.
-
 	close(clientSocket);
 
 	if(*maxfds == clientSocket)
@@ -311,7 +315,7 @@ void saveMessage(std::string token, std::string msg,bool clientCommand,std::stri
 	} else {
 		sender = groupFrom;
 	}
-	//If a person to send to already exist in the map we incerase their messages count. Otherwise a new class object
+	//If a person to send to already exist in the map we increase their messages count. Otherwise a new class object
 	// is appended to the vector.
 	if(inMap){
 		messages[token] -> groupNumberSendFrom.push_back(sender);
@@ -326,85 +330,50 @@ void saveMessage(std::string token, std::string msg,bool clientCommand,std::stri
 	}
 }
 // Send message to handle both SEND MSG from our client and commands from other servers.
-void sendMessage(std::vector<std::string> tokens,bool ourClientCommand){
+void sendMessage(std::vector<std::string> tokens,bool ourClientCommand) {
 	std::string msg;
 	std::string strOurId = std::string(OURGROUPID);
-	// If command came from client we start looking for message tokens one earlier since from is us.
-	// Else look concacinate message from 3 token onward.
-	if(ourClientCommand ==true){
-		for(auto i = tokens.begin()+2;i != tokens.end();i++)
-		{
-			msg += *i + " ";
-		}
-	}else{
-		for(auto i = tokens.begin()+3;i != tokens.end();i++)
-		{
-			msg += *i + " ";
-		}
+	// change message tokens into string.
+	for (auto i = tokens.begin() + 3; i != tokens.end(); i++) {
+		msg += *i + " ";
 	}
 	//Removing blank character in case it may break somebody code.
 	unsigned msglen = msg.length();
-	msg.resize(msglen-1);
+	msg.resize(msglen - 1);
 	bool directlyConnect = false;
 	int ourClientSocket = 0;
-	for(auto const& pair : clients) {
-		//If we found the name that means that the group is directly connected to us. The first case is
-		// when the message if from us otherwise is from other group to the group directly connected to us
-		if(pair.second->name.compare(tokens[1]) == 0) {
-			if(ourClientCommand == true){
-				std::string toSend = "*SEND_MSG," + tokens[1] + "," + strOurId + "," + msg + "#";
-				std::cout << toSend << " <---MSG SEND" << std::endl;
-				timestamp();
-				send(pair.second->sock,toSend.c_str(),toSend.length(),0);
-				directlyConnect = true;
-			}else{
-					std::string toSend = "*SEND_MSG," + tokens[1] + "," + tokens[2] + "," + msg + "#";
-					std::cout << toSend << " <---MSG SEND" << std::endl;
-					timestamp();
-					send(pair.second->sock,toSend.c_str(),toSend.length(),0);
-					directlyConnect = true;
+	for (auto const &pair : clients) {
+		//If we found the name that means that the group is directly connected to us.
+		if (pair.second->name.compare(tokens[1]) == 0) {
+			std::string toSend = "*SEND_MSG," + tokens[1] + "," + tokens[2] + "," + msg + "#";
+			std::cout << toSend << " <---MSG SEND" << std::endl;
+			timestamp();
+			send(pair.second->sock, toSend.c_str(), toSend.length(), 0);
+			directlyConnect = true;
+			if (pair.second->name.compare("OurClient") == 0) {
+				ourClientSocket = pair.second->sock;
 			}
 		}
-		if(pair.second->name.compare("OurClient") == 0) {
-			ourClientSocket = pair.second->sock;
-		}
 	}
-	if(directlyConnect) {
-		if(ourClientCommand == true){
-			// Sending conformation to my client
-			std::string toSend = "This has been send to directly connected group: *SEND_MSG," + tokens[1] + "," + strOurId + "," + msg + "#";
-			send(ourClientSocket,toSend.c_str(),toSend.length(),0);
-		}
-	}
-	else {
+	if (directlyConnect) {
+		std::string toSend =
+				"This has been send to directly connected group: *SEND_MSG," + tokens[1] + "," + strOurId + "," +
+				msg + "#";
+		send(ourClientSocket, toSend.c_str(), toSend.length(), 0);
+	}else{
 		// If the group is not directly connected we save the messages and re-send them forward.
-		if(ourClientCommand == true){
-			saveMessage(tokens[1], msg,ourClientCommand,strOurId);
-		}else{
-			saveMessage(tokens[1],msg,ourClientCommand,tokens[2]);
-		}
-		for(auto const& pair : clients) {
-			//If from our clien
-			if(pair.second->name.compare(strOurId) != 0 && pair.second->name.compare("OurClient") != 0) {
-				if(ourClientCommand == true){
-					std::string toSend = "*SEND_MSG," + tokens[1] + "," + strOurId + "," + msg + "#";
-					std::cout << toSend << " <---MSG SEND" << std::endl;
-					timestamp();
-					send(pair.second->sock,toSend.c_str(),toSend.length(),0);
+		saveMessage(tokens[1], msg, ourClientCommand, tokens[2]);
+		for (auto const &pair : clients) {
+			if (pair.second->name.compare(strOurId) != 0 && pair.second->name.compare("OurClient") != 0) {
+				std::string toSend = "*SEND_MSG," + tokens[1] + "," + tokens[2] + "," + msg + "#";
+				std::cout << toSend << " <---MSG SEND" << std::endl;
+				timestamp();
+				if (pair.second->name.compare(tokens[2]) != 0) {
+					send(pair.second->sock, toSend.c_str(), toSend.length(), 0);
 					// Let client know is message was forwarded
-					toSend = "This has been send forward: *SEND_MSG," + tokens[1] + "," + strOurId + "," + msg + "#";
-					send(ourClientSocket,toSend.c_str(),toSend.length(),0);
-				}else{
-					std::string toSend = "*SEND_MSG," + tokens[1] + "," + tokens[2] + "," + msg + "#";
-					std::cout << toSend << " <---MSG SEND" << std::endl;
-					timestamp();
-					std::cout << pair.second->name << std::endl;
-					if(pair.second->name.compare(tokens[2]) != 0){
-						send(pair.second->sock,toSend.c_str(),toSend.length(),0);
-						// Let client know is message was forwarded
-						toSend = "This has been send forward: *SEND_MSG," + tokens[1] + "," + tokens[2] + "," + msg + "#";
-						send(ourClientSocket,toSend.c_str(),toSend.length(),0);
-					}
+					toSend = "This has been send forward: *SEND_MSG," + tokens[1] + "," + tokens[2] + "," + msg +
+							 "#";
+					send(ourClientSocket, toSend.c_str(), toSend.length(), 0);
 				}
 			}
 		}
@@ -434,7 +403,6 @@ void getMessage(std::vector<std::string> tokens, int socket){
 		send(socket, toSend.c_str(), toSend.length(), 0);
 	}
 }
-
 // Process command from client on the server
 // in the first if we deal with all commands from ourClient then we deal with the server commands.
 void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
@@ -543,7 +511,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
 			send(clientSocket, msg.c_str(), msg.length(), 0);
 
 		}
-		else if((commandsFromServers[0].find("SEND_MSG") != std::string::npos) && (commandsFromServers.size() == 4))
+		else if((commandsFromServers[0].find("SEND_MSG") != std::string::npos) && (commandsFromServers.size() >= 4))
 		{
 			//SEND MSG,<TO GROUP ID>,<FROM GROUP ID>,<Message content>
 			std::string strOurId = std::string(OURGROUPID);
@@ -569,7 +537,7 @@ void clientCommand(int clientSocket, fd_set *openSockets, int *maxfds,
 		//Handle LEAVE commands from servers.
 		else if((commandsFromServers[0].find("LEAVE") != std::string::npos) && (commandsFromServers.size() == 3))
 		{
-			//Trying to prevent error if stoi() gets a string thats not a number.
+			//Trying to prevent error if stoi() gets a string that is not a number.
 			int value;
 			try {
 				value = std::stoi(commandsFromServers[2]);
@@ -736,7 +704,7 @@ int main(int argc, char* argv[])
 						}
 						keepAliveString += "#";
 						send(client->sock, keepAliveString.c_str(), keepAliveString.length(), 0);
-						std::cout << keepAliveString << "KEEP ALIVE SEND!" << std::endl;
+						std::cout << keepAliveString << " <-- KEEP ALIVE SEND!" << std::endl;
 					}
 				}
 				//Restard the timer after message been send

@@ -4,7 +4,7 @@
 // Command line: ./chat_client 4000 
 //
 // Author: Jacky Mallett (jacky@ru.is)
-// Modified by Izabela Kinga Nieradko
+// Modified by Izabela Kinga Nieradko && Aron Úlfarsson
 //
 #include <stdio.h>
 #include <errno.h>
@@ -136,9 +136,9 @@ int main(int argc, char* argv[])
    std::string commandToSend;
    std::string messageToSend;
 
+   //Loop waiting for user commands.
    while(!finished)
    {
-
 	   std::cout << "Enter number for command: 1 --> GETMSG, 2 --> SENDMSG, 3 --> CONNECT_TO_ANOTHER_SERVER, 4 --> LISTSERVERS , 5 --> LEAVE SERVER \n";
 	   std::cin >> input;
 	   if (std::cin.fail()) {
@@ -163,7 +163,8 @@ int main(int argc, char* argv[])
 		   std::cout << "Enter the message to send: \n";
 		   getline(std::cin, messageToSend);
 		   std::cin.clear();
-		   commandToSend = std::string("SENDMSG") + std::string(" ") + std::string("P3_GROUP_") + std::to_string(groupNumb) + std::string(" ") + messageToSend;
+		   commandToSend = std::string("SENDMSG") + std::string(" ") + std::string("P3_GROUP_") + std::to_string(groupNumb) +
+		   		std::string(" ") + std::string("P3_GROUP_44") + std::string(" ") + messageToSend;
 		   std::cout << commandToSend << " command to send" << std::endl;
 	   }else if(input == 3){
 		   std::cout << "Enter the ip number of group you want to connect to: \n";
@@ -179,8 +180,8 @@ int main(int argc, char* argv[])
 		   std::cin >> portNumber;
 		   commandToSend = std::string("LEAVE") + std::string(" ") + ipNumber + std::string(" ") + portNumber;
 	   }
-	   	else{
-	   	commandToSend = "*QUERYSERVERS_PG_44#";
+	   else{
+	   	commandToSend = "LISTSERVERS";
 	   }
 	   bzero(buffer, sizeof(buffer));
 	   timestamp();
